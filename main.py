@@ -7,9 +7,8 @@ from email import encoders
 import pandas as pd
 from datetime import datetime
 
-# !!! DÜZELTME: Klasör adınız "scrappers" olduğu için importlar buna göre ayarlandı.
-from scrappers.hyundai_scraper import HyundaiScraper
-from scrappers.kia_scraper import KiaScraper
+from scrapers.hyundai_scraper import HyundaiScraper
+from scrapers.kia_scraper import KiaScraper
 
 # Gmail ayarları GitHub Actions secrets'tan çekilir
 GMAIL_USER = os.environ.get("GMAIL_USER")
