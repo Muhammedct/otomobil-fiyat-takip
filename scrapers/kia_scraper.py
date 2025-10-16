@@ -7,7 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 class KiaScraper(BaseScraper):
     def __init__(self):
         url = "https://www.kia.com/tr/satis-merkezi/fiyat-listesi.html"
-        super().__init__(url)
+        BaseScraper.__init__(self, url)
 
     def scrape(self):
         if self.driver:
