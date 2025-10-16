@@ -21,7 +21,7 @@ jobs:
         run: pip install -r requirements.txt
         
       - name: Chrome WebDriver'ı Kur
-        uses: nanasess/setup-chromedriver@v5 
+        uses: nanasess/setup-chromedriver@v3
 
       - name: Scrape ve E-posta Gönder
         run: python main.py
