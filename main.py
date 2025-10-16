@@ -6,16 +6,21 @@ from email.mime.base import MIMEBase
 from email import encoders
 import pandas as pd
 from datetime import datetime
-from scrapers.hyundai_scraper import HyundaiScraper
-from scrapers.kia_scraper import KiaScraper
 
+# !!! DÜZELTME: Klasör adınız "scrappers" olduğu için importlar buna göre ayarlandı.
+from scrappers.hyundai_scraper import HyundaiScraper
+from scrappers.kia_scraper import KiaScraper
 
+# Gmail ayarları GitHub Actions secrets'tan çekilir
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
 
 def scrape_and_save():
-    """Tüm scraper'ları çalıştırır ve veriyi Excel'e kaydeder."""
+    """
+    Tüm scraper'ları çalıştırır ve veriyi Excel'e kaydeder.
+    Veri çekilemezse None döndürerek Excel hatasını (IndexError) önler.
+    """
     scrapers = {
         "Hyundai": HyundaiScraper(),
         "Kia": KiaScraper()
@@ -24,19 +29,36 @@ def scrape_and_save():
     excel_filename = f"otomobil_fiyatlari_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
     archive_path = os.path.join("data_archive", excel_filename)
 
+    has_data = False
+
+    # ExcelWriter'ı oluştururken, hiç veri olmasa bile geçici olarak açar
     with pd.ExcelWriter(archive_path) as writer:
         for brand, scraper in scrapers.items():
             print(f"{brand} için veriler kazınıyor...")
             try:
                 scraper.scrape()
                 df = scraper.get_dataframe()
+
+                # Sadece DataFrame boş değilse Excel'e yazar
                 if not df.empty:
-                    df.to_excel(writer, sheet_name=brand, index=False)
-                    print(f"{brand} verileri başarıyla alındı.")
+                    sheet_name_safe = brand.replace(" ", "_").replace("/", "_")
+                    df.to_excel(writer, sheet_name=sheet_name_safe, index=False)
+                    print(f"{brand} verileri başarıyla alındı. {len(df)} satır.")
+                    has_data = True
                 else:
                     print(f"{brand} için veri bulunamadı.")
             except Exception as e:
                 print(f"Hata: {brand} scraper çalışırken bir hata oluştu - {e}")
+            finally:
+                # Selenium driver'ın kapatıldığından emin olunur
+                if hasattr(scraper, 'driver') and scraper.driver:
+                    scraper.driver.quit()
+
+    if not has_data:
+        if os.path.exists(archive_path):
+            os.remove(archive_path)
+        print("UYARI: Hiçbir veri kazınamadı. Excel dosyası oluşturulmadı.")
+        return None
 
     return archive_path
 
@@ -79,4 +101,8 @@ if __name__ == "__main__":
         os.makedirs('data_archive')
 
     excel_file = scrape_and_save()
-    send_email(excel_file)
+
+    if excel_file:
+        send_email(excel_file)
+    else:
+        print("Veri kazıma başarısız oldu veya hiç veri bulunamadı. E-posta gönderilmiyor.")
