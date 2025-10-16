@@ -1,0 +1,29 @@
+name: Otomobil Fiyat Takip
+
+on:
+  schedule:
+    - cron: '0 8 17 * *'  # Her ayın 17'sinde sabah 8:00'de çalışır
+  workflow_dispatch:
+
+jobs:
+  scrape-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodları Çek
+        uses: actions/checkout@v2
+
+      - name: Python'u Kur
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Gerekli Kütüphaneleri Yükle
+        run: |
+          pip install -r requirements.txt
+
+      - name: Scrape ve E-posta Gönder
+        run: python -m main
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
