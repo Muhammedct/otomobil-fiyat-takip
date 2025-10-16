@@ -22,7 +22,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Scrape ve E-posta Gönder
-        run: python main.py
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          python main.py
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
