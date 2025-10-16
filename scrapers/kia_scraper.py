@@ -15,7 +15,7 @@ class KiaScraper(BaseScraper):
                 self.driver.get(self.url)
 
                 table_xpath = '//div[@class="price-list"]'
-                WebDriverWait(self.driver, 15).until(
+                WebDriverWait(self.driver, 25).until(
                     EC.presence_of_element_located((By.XPATH, table_xpath))
                 )
 
@@ -46,5 +46,3 @@ class KiaScraper(BaseScraper):
 
             except Exception as e:
                 print(f"Kia Scraper Hata: {e}")
-            finally:
-                self.driver.quit()

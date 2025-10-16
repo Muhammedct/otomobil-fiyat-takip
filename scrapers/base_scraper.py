@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+import os
 
 class BaseScraper:
     def __init__(self, url):
@@ -16,37 +17,26 @@ class BaseScraper:
     def _initialize_driver(self):
         """GitHub Actions için özel Chrome/WebDriver başlatma."""
         chrome_options = Options()
-        # Headless modu: Tarayıcıyı görsel arayüz olmadan çalıştır
+
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
 
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
 
-        service = Service() # Bu varsayılan yolu kullanır
+        service = Service(service_log_path=os.devnull)
 
         try:
             driver = webdriver.Chrome(service=service, options=chrome_options)
-            driver.set_page_load_timeout(30)
+            driver.set_page_load_timeout(45)
             return driver
         except Exception as e:
-            print(f"WebDriver başlatılamadı: {e}")
+            print(f"WebDriver başlatılamadı. Chrome kurulu ve PATH'e ekli mi? Hata: {e}")
             return None
 
-    def _get_soup(self):
-        """Sayfanın tam yüklendiğinden emin olup HTML'i döndürür."""
-        if self.driver:
-            try:
-                self.driver.get(self.url)
-                WebDriverWait(self.driver, 10).until(
-                    EC.presence_of_element_located((By.TAG_NAME, "body"))
-                )
-                return BeautifulSoup(self.driver.page_source, 'html.parser')
-            except Exception as e:
-                print(f"URL yüklenirken hata oluştu: {e}")
-                return None
-        return None
-
     def scrape(self):
+        """Bu metodun alt sınıflarda uygulanması zorunludur."""
         raise NotImplementedError("Bu metod alt sınıflar tarafından uygulanmalıdır.")
 
     def get_dataframe(self):

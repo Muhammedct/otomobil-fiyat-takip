@@ -15,7 +15,7 @@ class HyundaiScraper(BaseScraper):
                 self.driver.get(self.url)
 
                 table_xpath = '//table[@class="price-table"]'
-                WebDriverWait(self.driver, 15).until(
+                WebDriverWait(self.driver, 25).until( # Saniye artırıldı
                     EC.presence_of_element_located((By.XPATH, table_xpath))
                 )
 
@@ -44,5 +44,3 @@ class HyundaiScraper(BaseScraper):
 
             except Exception as e:
                 print(f"Hyundai Scraper Hata: {e}")
-            finally:
-                self.driver.quit()
