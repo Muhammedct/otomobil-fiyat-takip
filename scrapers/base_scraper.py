@@ -29,3 +29,5 @@ class BaseScraper:
             driver.set_page_load_timeout(60)
             return driver
         except Exception as e:
+            print(f"WebDriver başlatılamadı. Chrome kurulu ve PATH'e ekli mi? Hata: {e}")
+            return None
