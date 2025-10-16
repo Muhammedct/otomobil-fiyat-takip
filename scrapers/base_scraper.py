@@ -1,28 +1,58 @@
-import requests
-from bs4 import BeautifulSoup
 import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
 
 class BaseScraper:
     def __init__(self, url):
         self.url = url
-        self.soup = self._get_soup()
-        if self.soup is None:
-            raise Exception(f"URL'ye erişilemedi: {self.url}")
+        self.driver = self._initialize_driver()
+        self.data = []
+
+    def _initialize_driver(self):
+        """GitHub Actions için özel Chrome/WebDriver başlatma."""
+        chrome_options = Options()
+        # Headless modu: Tarayıcıyı görsel arayüz olmadan çalıştır
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+
+
+        service = Service() # Bu varsayılan yolu kullanır
+
+        try:
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            driver.set_page_load_timeout(30)
+            return driver
+        except Exception as e:
+            print(f"WebDriver başlatılamadı: {e}")
+            return None
 
     def _get_soup(self):
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(self.url, headers=headers)
-            response.raise_for_status()
-            return BeautifulSoup(response.content, 'html.parser')
-        except requests.exceptions.RequestException as e:
-            print(f"URL'ye erişilirken hata oluştu: {e}")
-            return None
+        """Sayfanın tam yüklendiğinden emin olup HTML'i döndürür."""
+        if self.driver:
+            try:
+                self.driver.get(self.url)
+                WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                return BeautifulSoup(self.driver.page_source, 'html.parser')
+            except Exception as e:
+                print(f"URL yüklenirken hata oluştu: {e}")
+                return None
+        return None
 
     def scrape(self):
         raise NotImplementedError("Bu metod alt sınıflar tarafından uygulanmalıdır.")
 
     def get_dataframe(self):
-        raise NotImplementedError("Bu metod alt sınıflar tarafından uygulanmalıdır.")
+        return pd.DataFrame(self.data)
+
+    def __del__(self):
+        """Scraper nesnesi silinirken tarayıcıyı kapat."""
+        if self.driver:
+            self.driver.quit()

@@ -1,29 +1,48 @@
 from .base_scraper import BaseScraper
 import pandas as pd
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 class HyundaiScraper(BaseScraper):
     def __init__(self):
         url = "https://www.hyundai.com/tr/tr/arac-satis/arac-fiyat-listesi"
         super().__init__(url)
-        self.data = []
 
     def scrape(self):
-        if self.soup:
-            price_list = self.soup.find('div', class_='price-list-table')
-            if not price_list:
-                print("Hyundai fiyat listesi tablosu bulunamadı.")
-                return
+        if self.driver:
+            try:
+                self.driver.get(self.url)
 
-            rows = price_list.find_all('tr')
-            for row in rows:
-                cols = row.find_all(['td', 'th'])
-                cols = [ele.text.strip() for ele in cols]
-                if cols and len(cols) > 2:
-                    self.data.append({
-                        "Model": cols[0],
-                        "Fiyat": cols[1],
-                        "Tarih": pd.Timestamp.now().strftime('%Y-%m-%d')
-                    })
+                table_xpath = '//table[@class="price-table"]'
+                WebDriverWait(self.driver, 15).until(
+                    EC.presence_of_element_located((By.XPATH, table_xpath))
+                )
 
-    def get_dataframe(self):
-        return pd.DataFrame(self.data)
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+
+                price_list_table = soup.find('table', class_='price-table')
+                if not price_list_table:
+                    print("Hyundai: Fiyat tablosu (price-table) bulunamadı.")
+                    return
+
+                rows = price_list_table.find('tbody').find_all('tr')
+
+                for row in rows:
+                    cols = row.find_all('td')
+                    if cols and len(cols) >= 3:
+                        model = cols[0].text.strip()
+                        fiyat = cols[-1].text.strip().replace('TL', '').replace('.', '').strip()
+
+                        if model and fiyat:
+                            self.data.append({
+                                "Marka": "Hyundai",
+                                "Model": model,
+                                "Fiyat": fiyat,
+                                "Tarih": pd.Timestamp.now().strftime('%Y-%m-%d')
+                            })
+
+            except Exception as e:
+                print(f"Hyundai Scraper Hata: {e}")
+            finally:
+                self.driver.quit()
