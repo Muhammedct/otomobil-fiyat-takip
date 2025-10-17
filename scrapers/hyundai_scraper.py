@@ -13,21 +13,29 @@ class HyundaiScraper(BaseScraper):
         super().__init__(url)
 
     def scrape(self) -> pd.DataFrame:
-        print("Hyundai verileri Selenium ile çekiliyor...")
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-
+        driver = None
         try:
+            options = webdriver.ChromeOptions()
+            options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--window-size=1920,1080')
+            options.add_argument("start-maximized")
+            options.add_argument("--disable-extensions")
+
+            print("  - ChromeDriver başlatılıyor...")
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=options)
+            driver.set_page_load_timeout(45)
 
+            print(f"  - Sayfa isteniyor: {self.url}")
             driver.get(self.url)
-
+            print("  - Fiyat tablosunun yüklenmesi bekleniyor...")
             wait = WebDriverWait(driver, 30)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, 'table')))
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.container table.table')))
 
+            print("  - Tablo bulundu, sayfa kaynağı okunuyor...")
             page_source = driver.page_source
             tables = pd.read_html(page_source, flavor='lxml')
 
@@ -38,12 +46,13 @@ class HyundaiScraper(BaseScraper):
             df = tables[0]
             df.columns = ['Model', 'Yakıt/Donanım', 'Fiyat']
             df['Marka'] = 'Hyundai'
-            print("Hyundai verileri başarıyla çekildi.")
+            print("✅ Hyundai verileri başarıyla çekildi.")
             return df
 
         except Exception as e:
-            print(f"HATA: Hyundai scraper (Selenium) çalışırken bir hata oluştu: {e}")
+            print(f"❌ HATA: Hyundai scraper (Selenium) çalışırken bir hata oluştu: {e}")
             return pd.DataFrame()
         finally:
-            if 'driver' in locals():
+            if driver:
+                print("  - Hyundai için tarayıcı kapatılıyor.")
                 driver.quit()
