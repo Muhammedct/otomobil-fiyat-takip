@@ -6,6 +6,7 @@ import pandas as pd
 class KiaScraper(BaseScraper):
     """
     Kia Türkiye fiyat listesi sayfasından veri çekmek için scraper.
+    (Web sitesindeki class ismi değişikliğine göre güncellendi - 17 Ekim 2025)
     """
     def __init__(self):
         url = "https://www.kia.com/tr/satis-merkezi/fiyat-listesi.html"
@@ -14,12 +15,20 @@ class KiaScraper(BaseScraper):
     def scrape(self) -> pd.DataFrame:
         print("Kia verileri çekiliyor...")
         try:
-            response = requests.get(self.url, timeout=15)
-            response.raise_for_status() # HTTP hata kontrolü
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(self.url, timeout=20, headers=headers)
+            response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
 
             data = []
-            model_boxes = soup.find_all('div', class_='model-price-list-box')
+            model_boxes = soup.find_all('div', class_='model-price-list-box new-type')
+            # -------------------------
+
+            if not model_boxes:
+                print("UYARI: Kia sayfasında model kutuları bulunamadı. Site yapısı değişmiş olabilir.")
+                return pd.DataFrame()
 
             for box in model_boxes:
                 model_name_tag = box.find('h3', class_='title')
@@ -36,7 +45,7 @@ class KiaScraper(BaseScraper):
                         data.append([model_name, version, price])
 
             if not data:
-                print("UYARI: Kia sayfasında veri bulunamadı. Site yapısı değişmiş olabilir.")
+                print("UYARI: Kia model kutuları bulundu fakat içinde veri okunamadı.")
                 return pd.DataFrame()
 
             df = pd.DataFrame(data, columns=['Model', 'Donanım', 'Fiyat'])
