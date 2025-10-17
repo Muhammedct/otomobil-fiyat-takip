@@ -1,58 +1,42 @@
 from .base_scraper import BaseScraper
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 
 class HyundaiScraper(BaseScraper):
     def __init__(self):
-        url = "https://www.hyundai.com/tr/tr/satin-al/fiyat-listesi"
-        super().__init__(url)
+        api_url = "https://www.hyundai.com/content/dam/hyundai/tr/tr/json/satin-al/fiyat-listesi-binek.json"
+        super().__init__(api_url)
 
     def scrape(self) -> pd.DataFrame:
-        driver = None
+        print("Hyundai verileri DOĞRUDAN API'den çekiliyor...")
         try:
-            options = webdriver.ChromeOptions()
-            options.add_argument('--headless')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--window-size=1920,1080')
-            options.add_argument("start-maximized")
-            options.add_argument("--disable-extensions")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(self.url, headers=headers, timeout=20)
+            response.raise_for_status()
 
-            print("  - ChromeDriver başlatılıyor...")
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=options)
-            driver.set_page_load_timeout(45)
+            json_data = response.json()
 
-            print(f"  - Sayfa isteniyor: {self.url}")
-            driver.get(self.url)
-            print("  - Fiyat tablosunun yüklenmesi bekleniyor...")
-            wait = WebDriverWait(driver, 30)
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.container table.table')))
+            price_data = []
+            for model_category in json_data.get('data', []):
+                for model in model_category.get('models', []):
+                    model_name = model.get('modelName')
+                    for spec in model.get('specs', []):
+                        donanim = spec.get('specName')
+                        fiyat = spec.get('price')
+                        if model_name and donanim and fiyat:
+                            price_data.append([model_name, donanim, fiyat])
 
-            print("  - Tablo bulundu, sayfa kaynağı okunuyor...")
-            page_source = driver.page_source
-            tables = pd.read_html(page_source, flavor='lxml')
-
-            if not tables:
-                print("UYARI: Hyundai sayfasında tablo bulunamadı.")
+            if not price_data:
+                print("UYARI: Hyundai API'sinden veri alınamadı veya format değişmiş.")
                 return pd.DataFrame()
 
-            df = tables[0]
-            df.columns = ['Model', 'Yakıt/Donanım', 'Fiyat']
+            df = pd.DataFrame(price_data, columns=['Model', 'Donanım', 'Fiyat'])
             df['Marka'] = 'Hyundai'
-            print("✅ Hyundai verileri başarıyla çekildi.")
+            print("✅ Hyundai verileri API'den başarıyla çekildi.")
             return df
 
         except Exception as e:
-            print(f"❌ HATA: Hyundai scraper (Selenium) çalışırken bir hata oluştu: {e}")
+            print(f"❌ HATA: Hyundai API scraper çalışırken bir hata oluştu: {e}")
             return pd.DataFrame()
-        finally:
-            if driver:
-                print("  - Hyundai için tarayıcı kapatılıyor.")
-                driver.quit()

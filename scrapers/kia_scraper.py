@@ -1,12 +1,8 @@
 from .base_scraper import BaseScraper
 import pandas as pd
+import requests
+import json
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 class KiaScraper(BaseScraper):
     def __init__(self):
@@ -14,54 +10,43 @@ class KiaScraper(BaseScraper):
         super().__init__(url)
 
     def scrape(self) -> pd.DataFrame:
-        driver = None
+        print("Kia verileri DOĞRUDAN sayfa kaynağından (JS objesi) çekiliyor...")
         try:
-            options = webdriver.ChromeOptions()
-            options.add_argument('--headless')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--window-size=1920,1080')
-            options.add_argument("start-maximized")
-            options.add_argument("--disable-extensions")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(self.url, headers=headers, timeout=20)
+            response.raise_for_status()
 
-            print("  - ChromeDriver başlatılıyor...")
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=options)
-            driver.set_page_load_timeout(45)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            script_tag = soup.find('script', string=lambda t: 'gtmModelPriceData' in str(t))
 
-            print(f"  - Sayfa isteniyor: {self.url}")
-            driver.get(self.url)
-            print("  - Fiyat kutularının yüklenmesi bekleniyor...")
-            wait = WebDriverWait(driver, 30)
-            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.model-price-list-box.new-type')))
-
-            print("  - Fiyat kutuları bulundu, sayfa kaynağı okunuyor...")
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-            data = []
-            model_boxes = soup.find_all('div', class_='model-price-list-box new-type')
-
-            if not model_boxes:
-                print("UYARI: Kia sayfasında model kutuları bulunamadı.")
+            if not script_tag:
+                print("UYARI: Kia sayfasında fiyat verisini içeren script etiketi bulunamadı.")
                 return pd.DataFrame()
 
-            for box in model_boxes:
-                model_name = box.find('h3', class_='title').text.strip()
-                for item in box.find_all('li'):
-                    version = item.find('p').text.strip()
-                    price = item.find('span', class_='price').text.strip()
-                    data.append([model_name, version, price])
+            script_content = script_tag.string
+            json_str = script_content.split('gtmModelPriceData: ')[1].split(';\n')[0]
+            json_data = json.loads(json_str)
 
-            df = pd.DataFrame(data, columns=['Model', 'Donanım', 'Fiyat'])
+            price_data = []
+            for model_data in json_data:
+                model_name = model_data.get('modelName')
+                for trim in model_data.get('trim', []):
+                    donanim = trim.get('name')
+                    fiyat = trim.get('price')
+                    if model_name and donanim and fiyat:
+                        price_data.append([model_name, donanim, str(fiyat)])
+
+            if not price_data:
+                print("UYARI: Kia verisi okunamadı veya format değişmiş.")
+                return pd.DataFrame()
+
+            df = pd.DataFrame(price_data, columns=['Model', 'Donanım', 'Fiyat'])
             df['Marka'] = 'Kia'
             print("✅ Kia verileri başarıyla çekildi.")
             return df
 
         except Exception as e:
-            print(f"❌ HATA: Kia scraper (Selenium) çalışırken bir hata oluştu: {e}")
+            print(f"❌ HATA: Kia scraper çalışırken bir hata oluştu: {e}")
             return pd.DataFrame()
-        finally:
-            if driver:
-                print("  - Kia için tarayıcı kapatılıyor.")
-                driver.quit()

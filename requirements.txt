@@ -3,5 +3,3 @@ beautifulsoup4
 pandas
 openpyxl
 lxml
-selenium
-webdriver-manager
