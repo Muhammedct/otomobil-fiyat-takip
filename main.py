@@ -1,107 +1,58 @@
-import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-import pandas as pd
-from datetime import datetime
+# main.py
 
+import pandas as pd
 from scrapers.hyundai_scraper import HyundaiScraper
 from scrapers.kia_scraper import KiaScraper
+from utils.excel_handler import save_to_excel, read_from_excel, compare_dataframes
+from utils.email_handler import send_email
+from datetime import datetime
 
-# Gmail ayarları GitHub Actions secrets'tan çekilir
-GMAIL_USER = os.environ.get("GMAIL_USER")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
-RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
+EXCEL_FILENAME = "otomobil_fiyatlari.xlsx"
 
-def scrape_and_save():
-    """
-    Tüm scraper'ları çalıştırır ve veriyi Excel'e kaydeder.
-    Veri çekilemezse None döndürerek Excel hatasını (IndexError) önler.
-    """
+def scrape_and_process():
+    """Tüm markaların verilerini çeker ve birleştirir."""
     scrapers = {
         "Hyundai": HyundaiScraper(),
-        "Kia": KiaScraper()
+        "Kia": KiaScraper(),
     }
 
-    excel_filename = f"otomobil_fiyatlari_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
-    archive_path = os.path.join("data_archive", excel_filename)
+    all_data = []
+    for brand, scraper_instance in scrapers.items():
+        try:
+            df = scraper_instance.scrape()
+            if not df.empty:
+                all_data.append(df)
+        except Exception as e:
+            print(f"HATA: {brand} scraper'ı çalıştırılırken bir hata oluştu: {e}")
 
-    has_data = False
-
-    # ExcelWriter'ı oluştururken, hiç veri olmasa bile geçici olarak açar
-    with pd.ExcelWriter(archive_path) as writer:
-        for brand, scraper in scrapers.items():
-            print(f"{brand} için veriler kazınıyor...")
-            try:
-                scraper.scrape()
-                df = scraper.get_dataframe()
-
-                # Sadece DataFrame boş değilse Excel'e yazar
-                if not df.empty:
-                    sheet_name_safe = brand.replace(" ", "_").replace("/", "_")
-                    df.to_excel(writer, sheet_name=sheet_name_safe, index=False)
-                    print(f"{brand} verileri başarıyla alındı. {len(df)} satır.")
-                    has_data = True
-                else:
-                    print(f"{brand} için veri bulunamadı.")
-            except Exception as e:
-                print(f"Hata: {brand} scraper çalışırken bir hata oluştu - {e}")
-            finally:
-                # Selenium driver'ın kapatıldığından emin olunur
-                if hasattr(scraper, 'driver') and scraper.driver:
-                    scraper.driver.quit()
-
-    if not has_data:
-        if os.path.exists(archive_path):
-            os.remove(archive_path)
-        print("UYARI: Hiçbir veri kazınamadı. Excel dosyası oluşturulmadı.")
+    if not all_data:
+        print("Hiçbir markadan veri çekilemedi. İşlem sonlandırılıyor.")
         return None
 
-    return archive_path
-
-def send_email(file_path):
-    """Excel dosyasını e-posta ile gönderir."""
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = GMAIL_USER
-        msg['To'] = RECEIVER_EMAIL
-        msg['Subject'] = f"Güncel Otomobil Fiyatları - {datetime.now().strftime('%Y-%m-%d')}"
-
-        body = "Merhaba,\n\nEkte güncel otomobil fiyat listesi bulunmaktadır.\n\nSevgilerle,\nFiyat Takip Botu"
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Dosyayı e-postaya ekle
-        with open(file_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename= {os.path.basename(file_path)}",
-            )
-            msg.attach(part)
-
-        # SMTP Sunucusuna Bağlanma ve E-posta Gönderme
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            text = msg.as_string()
-            server.sendmail(GMAIL_USER, RECEIVER_EMAIL, text)
-
-        print("E-posta başarıyla gönderildi!")
-
-    except Exception as e:
-        print(f"E-posta gönderilirken bir hata oluştu: {e}")
+    return pd.concat(all_data, ignore_index=True)
 
 if __name__ == "__main__":
-    if not os.path.exists('data_archive'):
-        os.makedirs('data_archive')
+    start_time = datetime.now()
+    print(f"İşlem başladı: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    excel_file = scrape_and_save()
+    old_data = read_from_excel(EXCEL_FILENAME)
+    new_data = scrape_and_process()
 
-    if excel_file:
-        send_email(excel_file)
+    if new_data is not None and not new_data.empty:
+        has_changed, changes_summary = compare_dataframes(old_data, new_data)
+
+        if has_changed:
+            print("Fiyat listesinde değişiklik tespit edildi. Bildirim hazırlanıyor...")
+            email_subject = "Otomobil Fiyatlarında Değişiklik Tespit Edildi!"
+            email_body = f"Merhaba,\n\nAraç fiyat listelerinde aşağıdaki değişiklikler tespit edilmiştir:\n\n{changes_summary}"
+
+            send_email(email_subject, email_body)
+            save_to_excel(new_data, EXCEL_FILENAME)
+        else:
+            print("Fiyatlarda herhangi bir değişiklik bulunamadı.")
     else:
-        print("Veri kazıma başarısız oldu veya hiç veri bulunamadı. E-posta gönderilmiyor.")
+        print("Yeni veri alınamadığı için karşılaştırma yapılamadı.")
+
+    end_time = datetime.now()
+    print(f"İşlem tamamlandı: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Toplam süre: {end_time - start_time}")

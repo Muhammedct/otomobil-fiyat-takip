@@ -1,48 +1,52 @@
 from .base_scraper import BaseScraper
+import requests
+from bs4 import BeautifulSoup
 import pandas as pd
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 class KiaScraper(BaseScraper):
+    """
+    Kia Türkiye fiyat listesi sayfasından veri çekmek için scraper.
+    """
     def __init__(self):
         url = "https://www.kia.com/tr/satis-merkezi/fiyat-listesi.html"
-        BaseScraper.__init__(self, url)
+        super().__init__(url)
 
-    def scrape(self):
-        if self.driver:
-            try:
-                self.driver.get(self.url)
+    def scrape(self) -> pd.DataFrame:
+        print("Kia verileri çekiliyor...")
+        try:
+            response = requests.get(self.url, timeout=15)
+            response.raise_for_status() # HTTP hata kontrolü
+            soup = BeautifulSoup(response.content, 'html.parser')
 
-                table_xpath = '//div[@class="price-list"]'
-                WebDriverWait(self.driver, 25).until(
-                    EC.presence_of_element_located((By.XPATH, table_xpath))
-                )
+            data = []
+            model_boxes = soup.find_all('div', class_='model-price-list-box')
 
-                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+            for box in model_boxes:
+                model_name_tag = box.find('h3', class_='title')
+                model_name = model_name_tag.text.strip() if model_name_tag else "Bilinmeyen Model"
 
-                price_list_container = soup.find('div', class_='price-list')
-                if not price_list_container:
-                    print("Kia: Fiyat listesi konteyneri bulunamadı.")
-                    return
+                price_items = box.find_all('li')
+                for item in price_items:
+                    version_tag = item.find('p')
+                    price_tag = item.find('span', class_='price')
 
-                price_tables = price_list_container.find_all('table', class_='price-list__table')
+                    if version_tag and price_tag:
+                        version = version_tag.text.strip()
+                        price = price_tag.text.strip()
+                        data.append([model_name, version, price])
 
-                for table in price_tables:
-                    rows = table.find('tbody').find_all('tr')
-                    for row in rows:
-                        cols = row.find_all('td')
-                        if cols and len(cols) >= 3:
-                            model = cols[0].text.strip()
-                            fiyat = cols[-1].text.strip().replace('TL', '').replace('.', '').strip()
+            if not data:
+                print("UYARI: Kia sayfasında veri bulunamadı. Site yapısı değişmiş olabilir.")
+                return pd.DataFrame()
 
-                            if model and fiyat:
-                                self.data.append({
-                                    "Marka": "Kia",
-                                    "Model": model,
-                                    "Fiyat": fiyat,
-                                    "Tarih": pd.Timestamp.now().strftime('%Y-%m-%d')
-                                })
+            df = pd.DataFrame(data, columns=['Model', 'Donanım', 'Fiyat'])
+            df['Marka'] = 'Kia'
+            print("Kia verileri başarıyla çekildi.")
+            return df
 
-            except Exception as e:
-                print(f"Kia Scraper Hata: {e}")
+        except requests.exceptions.RequestException as e:
+            print(f"HATA: Kia sayfasına erişirken bir ağ hatası oluştu: {e}")
+            return pd.DataFrame()
+        except Exception as e:
+            print(f"HATA: Kia scraper çalışırken bir hata oluştu: {e}")
+            return pd.DataFrame()
