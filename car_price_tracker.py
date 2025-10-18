@@ -501,9 +501,9 @@ if __name__ == "__main__":
     print("="*60 + "\n")
 
     # GitHub Secrets'tan environment variables al
-    GMAIL_USER = os.environ.get('GMAIL_USER')
-    GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD')
-    RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL')
+    GMAIL_USER = os.getenv('GMAIL_USER')
+    GMAIL_APP_PASSWORD = os.getenv('GMAIL_APP_PASSWORD')
+    RECIPIENT_EMAIL = os.getenv('RECIPIENT_EMAIL')
 
     # Kontrol et
     if not all([GMAIL_USER, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL]):
