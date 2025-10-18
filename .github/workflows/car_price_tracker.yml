@@ -42,9 +42,9 @@ jobs:
     
     - name: Run Price Tracker
       env:
-        GMAIL_USER: ${{ secrets.GMAIL_USER }}
-        GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        GMAIL_USER: ${{ secrets.EMAIL_SENDER }}
+        GMAIL_APP_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        RECIPIENT_EMAIL: ${{ secrets.EMAIL_RECEIVER }}
       run: |
         python car_price_tracker.py
     
