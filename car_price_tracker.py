@@ -500,56 +500,32 @@ if __name__ == "__main__":
     print("🔧 GitHub Actions Car Price Tracker v2.0")
     print("="*60 + "\n")
 
-    # DEBUG: Environment variables kontrolü
-    print("🔍 DEBUG - Environment Variables:")
-    print("="*60)
-
-    EMAIL_SENDER = os.environ.get('EMAIL_SENDER')
-    EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
-    EMAIL_RECEIVER = os.environ.get('EMAIL_RECEIVER')
-
-    if EMAIL_SENDER:
-        print(f"   ✅ EMAIL_SENDER: {EMAIL_SENDER}")
-    else:
-        print(f"   ❌ EMAIL_SENDER: NOT SET")
-
-    if EMAIL_PASSWORD:
-        print(f"   ✅ EMAIL_PASSWORD: {'*' * 16} (SET)")
-    else:
-        print(f"   ❌ EMAIL_PASSWORD: NOT SET")
-
-    if EMAIL_RECEIVER:
-        print(f"   ✅ EMAIL_RECEIVER: {EMAIL_RECEIVER}")
-    else:
-        print(f"   ❌ EMAIL_RECEIVER: NOT SET")
-
-    print("="*60 + "\n")
+    # GitHub Secrets'tan environment variables al
+    GMAIL_USER = os.environ.get('GMAIL_USER')
+    GMAIL_APP_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD')
+    RECIPIENT_EMAIL = os.environ.get('RECIPIENT_EMAIL')
 
     # Kontrol et
-    if not all([EMAIL_SENDER, EMAIL_PASSWORD, EMAIL_RECEIVER]):
+    if not all([GMAIL_USER, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL]):
         print("❌ HATA: GitHub Secrets ayarlanmamış!")
         print("\n📝 Yapılması gerekenler:")
         print("   1. Repository Settings > Secrets and variables > Actions")
         print("   2. Şu secret'ları ekleyin:")
-        print("      • EMAIL_SENDER (Gmail adresiniz)")
-        print("      • EMAIL_PASSWORD (Gmail App Password - 16 haneli)")
-        print("      • EMAIL_RECEIVER (Hedef email)")
-        print("\n🔗 Gmail App Password nasıl alınır:")
-        print("   https://myaccount.google.com/apppasswords")
-        print("   1. 2FA aktif olmalı")
-        print("   2. 'Uygulama şifreleri' > 'Diğer' > 'Car Tracker'")
-        print("   3. Oluşan 16 haneli şifreyi EMAIL_PASSWORD olarak kaydet")
+        print("      • GMAIL_USER (Gmail adresiniz)")
+        print("      • GMAIL_APP_PASSWORD (16 haneli App Password)")
+        print("      • RECIPIENT_EMAIL (Hedef email)")
+        print("\n🔗 Gmail App Password: https://myaccount.google.com/apppasswords")
         sys.exit(1)
 
-    print("✅ Environment variables başarıyla yüklendi!")
-    print(f"   Gönderen: {EMAIL_SENDER}")
-    print(f"   Alıcı: {EMAIL_RECEIVER}\n")
+    print("✅ Environment variables yüklendi")
+    print(f"   Gmail: {GMAIL_USER}")
+    print(f"   Alıcı: {RECIPIENT_EMAIL}\n")
 
     # Tracker'ı başlat ve çalıştır
     tracker = CarPriceTracker(
-        gmail_user=EMAIL_SENDER,
-        gmail_app_password=EMAIL_PASSWORD,
-        recipient_email=EMAIL_RECEIVER,
+        gmail_user=GMAIL_USER,
+        gmail_app_password=GMAIL_APP_PASSWORD,
+        recipient_email=RECIPIENT_EMAIL,
         max_retries=3
     )
 
